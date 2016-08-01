@@ -1,0 +1,3 @@
+[submodule "scripts"]
+	path = scripts
+	url = https://github.com/ThoughtWorksTurkey/marketwatcher-service-harness.git
