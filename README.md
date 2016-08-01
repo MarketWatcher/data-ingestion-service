@@ -1,1 +1,1 @@
-# marketwatcher-ingestion-service
+# MarketWatcher Data Ingestion Service
