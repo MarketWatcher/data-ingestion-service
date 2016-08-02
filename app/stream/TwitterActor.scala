@@ -11,14 +11,13 @@ class TwitterActor (producer: KafkaProducer[Long,String], topicName: String) ext
   def receive = {
     case TwitterDataPullRequest(status) =>
       val record = new ProducerRecord[Long, String](topicName, status.getId, status.getText)
-
       try {
      		producer.send(record)
     	} catch {
-        case e: Exception => 
+        case e: Exception =>
           println(e.getMessage)
     	}
 
-        //println(status)
+        println(status)
   }
 }

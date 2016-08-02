@@ -3,6 +3,7 @@ package controllers
 import java.util.{Date, UUID}
 import javax.inject._
 
+import twitter4j.conf.ConfigurationBuilder
 import play.api._
 import play.api.mvc._
 import play.api.libs.json._
@@ -11,16 +12,12 @@ import twitter4j.{FilterQuery, _}
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
 import stream.TwitterActor
 import stream.TwitterDataPullRequest
+import service.KafkaService
 
 case class Alert(id: Int, name: String)
 
 @Singleton
-class IngestionController @Inject()(system: ActorSystem) extends Controller {
-
-  def index = Action {
-    Ok("Hellooooo")
-  }
-
+class IngestionController @Inject()(system: ActorSystem, kafkaService: KafkaService) extends Controller {
   case class Alert(
                       name: String,
                       requiredCriteria: String
@@ -29,25 +26,23 @@ class IngestionController @Inject()(system: ActorSystem) extends Controller {
   implicit val alertReads = Json.reads[Alert]
 
   def initIngestion() = Action(BodyParsers.parse.json) { request =>
+    val producer = generateProducer()
     val alertResult = request.body.validate[Alert]
     alertResult.fold(
       errors => {
         BadRequest(Json.obj("status" ->"KO", "message" -> JsError.toJson(errors)))
       },
       alert => {
-        connectToTwitter(alert.name, alert.requiredCriteria)
+        connectToTwitter(alert.name, alert.requiredCriteria, producer)
       }
     )
   }
 
-  def connectToTwitter(name: String, requiredCriteria: String) = {
-    val props = new java.util.Properties()
-    props.put("bootstrap.servers", "***:9092")
-    props.put("acks", "all");
-    props.put("key.serializer", "org.apache.kafka.common.serialization.LongSerializer")
-    props.put("value.serializer", "org.apache.kafka.common.serialization.StringSerializer")
+  def generateProducer() : KafkaProducer[Long, String] = {
+      return kafkaService.createKafkaProducer()
+  }
 
-    val producer = new KafkaProducer[Long, String](props)
+  def connectToTwitter(name: String, requiredCriteria: String, producer: KafkaProducer[Long, String]) = {
 
     def simpleStatusListener = new StatusListener() {
       def onStatus(status: twitter4j.Status) {
@@ -68,10 +63,16 @@ class IngestionController @Inject()(system: ActorSystem) extends Controller {
       def onStallWarning(warning: StallWarning) {}
     }
 
-    val twitterStream = new TwitterStreamFactory().getInstance
+    var cb = new ConfigurationBuilder();
+    cb.setDebugEnabled(true)
+      .setOAuthConsumerKey(sys.env("twitterConsumerKey"))
+      .setOAuthConsumerSecret(sys.env("twitterConsumerSecret"))
+      .setOAuthAccessToken(sys.env("twitterAccessToken"))
+      .setOAuthAccessTokenSecret(sys.env("twitterAccessTokenSecret"))
+    val twitterStream = new TwitterStreamFactory(cb.build()).getInstance
     twitterStream.addListener(simpleStatusListener)
     twitterStream.filter(new FilterQuery().track(Array(requiredCriteria)))
-    Thread.sleep(50000)
+    println("SUCCESS")
     Ok("SUCCESS")
   }
 
