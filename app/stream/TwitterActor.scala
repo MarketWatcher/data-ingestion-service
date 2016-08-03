@@ -18,6 +18,6 @@ class TwitterActor (producer: KafkaProducer[Long,String], topicName: String) ext
           println(e.getMessage)
     	}
 
-        println(status)
+      println(status)
   }
 }
