@@ -1,6 +1,6 @@
 package loader
 
-import akka.actor.ActorSystem
+import akka.actor.{ActorRef, ActorSystem, Props}
 import com.sksamuel.kafka.embedded.EmbeddedKafkaConfig
 import controllers.IngestionController
 import play.api.ApplicationLoader.Context
@@ -11,6 +11,9 @@ import play.api.libs.ws.ahc.AhcWSComponents
 import play.api.routing.Router
 import router.Routes
 import service.KafkaProducerFactory
+import stream.{AlertPipeline, TwitterActor, TwitterDataPullRequest}
+import twitter4j.conf.ConfigurationBuilder
+import twitter4j._
 
 class Loader extends ApplicationLoader {
   override def load(context: Context): Application = {
@@ -39,7 +42,26 @@ class Components(context: ApplicationLoader.Context)
       messagesApi
   }
 
+  private def buildAlertPipeline(): AlertPipeline = {
+
+    val twitterConfigurationBuilder = new ConfigurationBuilder()
+    twitterConfigurationBuilder.setDebugEnabled(true)
+      .setOAuthConsumerKey(sys.env("twitterConsumerKey"))
+      .setOAuthConsumerSecret(sys.env("twitterConsumerSecret"))
+      .setOAuthAccessToken(sys.env("twitterAccessToken"))
+      .setOAuthAccessTokenSecret(sys.env("twitterAccessTokenSecret"))
+
+    lazy val twitterStreamFactory: TwitterStreamFactory = new TwitterStreamFactory(twitterConfigurationBuilder.build)
+    lazy val kafkaProducer = KafkaProducerFactory.create()
+    lazy val actorSystem = ActorSystem.create()
+
+    new AlertPipeline(twitterStreamFactory, kafkaProducer, actorSystem)
+
+  }
+
   lazy val router: Router = new Routes(httpErrorHandler, ingestionController)
 
-  lazy val ingestionController = new IngestionController(ActorSystem.create(), KafkaProducerFactory.create())
+
+
+  lazy val ingestionController = new IngestionController(buildAlertPipeline())
 }
