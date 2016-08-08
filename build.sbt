@@ -1,4 +1,4 @@
-name := "marketwatcher-data-stream"
+name := "data-ingestion-service"
 
 version := "1.0"
 
