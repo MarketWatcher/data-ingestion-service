@@ -11,6 +11,7 @@ import play.api.libs.ws.ahc.AhcWSComponents
 import play.api.routing.Router
 import router.Routes
 import service.KafkaProducerFactory
+import stream.StatusListenerFactory
 import stream.{AlertPipeline, TwitterActor, TwitterDataPullRequest}
 import twitter4j.conf.ConfigurationBuilder
 import twitter4j._
@@ -54,8 +55,9 @@ class Components(context: ApplicationLoader.Context)
     lazy val twitterStreamFactory: TwitterStreamFactory = new TwitterStreamFactory(twitterConfigurationBuilder.build)
     lazy val kafkaProducer = KafkaProducerFactory.create()
     lazy val actorSystem = ActorSystem.create()
-
-    new AlertPipeline(twitterStreamFactory, kafkaProducer, actorSystem)
+    lazy val statusListenerFactory = new StatusListenerFactory(kafkaProducer, actorSystem)
+    val twitterStream = twitterStreamFactory.getInstance
+    new AlertPipeline(twitterStream, statusListenerFactory)
 
   }
 
