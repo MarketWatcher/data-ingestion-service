@@ -16,27 +16,35 @@ import play.api.ApplicationLoader.Context
 import play.api.test.{FakeHeaders, FakeRequest}
 import play.api.test.Helpers._
 import service.KafkaProducerFactory
+import stream.StatusListenerFactory
 import java.io.File
 import java.util.concurrent.TimeUnit
 
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
 import stream.AlertPipeline
-import twitter4j.TwitterStreamFactory
+import twitter4j._
 import twitter4j.conf.ConfigurationBuilder
+import java.io.InputStream
 
-class FakeApplicationComponents(context: Context, producer: KafkaProducer[Long, String]) extends Components(context) {
-  val twitterConfiguration = new ConfigurationBuilder().setDebugEnabled(true)
-    .setOAuthConsumerKey(sys.env("twitterConsumerKey"))
-    .setOAuthConsumerSecret(sys.env("twitterConsumerSecret"))
-    .setOAuthAccessToken(sys.env("twitterAccessToken"))
-    .setOAuthAccessTokenSecret(sys.env("twitterAccessTokenSecret"))
+class StubAlertPipeline(twitterStream: TwitterStream, statusListenerFactory: StatusListenerFactory) extends AlertPipeline(twitterStream: TwitterStream, statusListenerFactory: StatusListenerFactory) {
+    override def push(alertName: String, alertRequiredCriteria: String) = {
+     produceSingleTweet(alertName, statusListenerFactory.producer)
+    }
 
-  override lazy val ingestionController = new IngestionController(new AlertPipeline(new TwitterStreamFactory(twitterConfiguration), producer, ActorSystem.create()))
+    def produceSingleTweet(alertName: String, producer: KafkaProducer[Long, String]) {
+        val record = new ProducerRecord[Long, String](alertName, 1, "iyi iyi cok iyi")
+        producer.send(record)
+    }
 }
 
-class FakeAppLoader(producer: KafkaProducer[Long, String]) extends ApplicationLoader {
+class FakeApplicationComponents(context: Context, alertPipelineStub: AlertPipeline) extends Components(context)  {
+  override lazy val ingestionController = new IngestionController(alertPipelineStub)
+}
+
+
+class FakeAppLoader(alertPipelineStub: AlertPipeline) extends ApplicationLoader {
   override def load(context: Context): Application = {
-    new FakeApplicationComponents(context, producer).application
+    new FakeApplicationComponents(context, alertPipelineStub).application
   }
 }
 
@@ -45,6 +53,10 @@ class IngestionControllerSpec extends FlatSpec with MockFactory with BeforeAndAf
   var kafka: EmbeddedKafka = null
   var kafkaConfig: EmbeddedKafkaConfig = null
   var producer: KafkaProducer[Long, String] = null
+  var statusStream: StatusStream
+
+  before {
+  }
 
   after {
     producer.close()
@@ -56,7 +68,22 @@ class IngestionControllerSpec extends FlatSpec with MockFactory with BeforeAndAf
     kafka = new EmbeddedKafka(kafkaConfig)
     producer = KafkaProducerFactory.createEmbedded(kafkaConfig)
 
-    val appLoader = new FakeAppLoader(producer)
+    val twitterConfiguration = new ConfigurationBuilder().setDebugEnabled(false)
+      .setOAuthConsumerKey(sys.env("twitterConsumerKey"))
+      .setOAuthConsumerSecret(sys.env("twitterConsumerSecret"))
+      .setOAuthAccessToken(sys.env("twitterAccessToken"))
+      .setOAuthAccessTokenSecret(sys.env("twitterAccessTokenSecret")).build()
+
+    lazy val twitterStreamFactory: TwitterStreamFactory = new TwitterStreamFactory(twitterConfiguration)
+    lazy val actorSystem = ActorSystem.create()
+    lazy val statusListenerFactory = new StatusListenerFactory(producer, actorSystem)
+    val twitterStream = twitterStreamFactory.getInstance
+
+    //lazy val alertPipelineStub = mock[AlertPipeline]
+    //alertPipelineStub.push(_: String, _: String).expects(*, *).onCall { alertName: String => produceSingleTweet(alertName, producer) }
+    val alertPipelineStub: StubAlertPipeline = new StubAlertPipeline(twitterStream, statusListenerFactory)
+
+    val appLoader = new FakeAppLoader(alertPipelineStub)
     val context = ApplicationLoader.createContext(
       new Environment(new File("."), ApplicationLoader.getClass.getClassLoader, Mode.Test)
     )

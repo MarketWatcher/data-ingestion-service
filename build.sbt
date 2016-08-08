@@ -3,14 +3,13 @@ name := "marketwatcher-data-stream"
 version := "1.0"
 
 scalaVersion := "2.11.8"
-val kafkaVersion = "0.9.0.0"
 
 lazy val root = (project in file(".")).enablePlugins(PlayScala)
 
 libraryDependencies ++= Seq(
   "org.twitter4j" % "twitter4j-stream" % "3.0.3",
   "com.typesafe.play" % "play-ws_2.11" % "2.5.4",
-  "org.apache.kafka" % "kafka-clients" % kafkaVersion,
+  "org.apache.kafka" % "kafka-clients" % "0.9.0.0",
   "org.scalamock" %% "scalamock-scalatest-support" % "3.2.2" % "test" copy (isChanging = false),
   "com.sksamuel.kafka.embedded" % "embedded-kafka_2.11" % "0.21.0" copy(isChanging = false),
   "org.scalatestplus.play" %% "scalatestplus-play" % "1.5.1" % Test
