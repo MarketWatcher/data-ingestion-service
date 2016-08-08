@@ -29,9 +29,11 @@ class FakeApplicationComponents(context: Context, producer: KafkaProducer[Long, 
     .setOAuthConsumerKey(sys.env("twitterConsumerKey"))
     .setOAuthConsumerSecret(sys.env("twitterConsumerSecret"))
     .setOAuthAccessToken(sys.env("twitterAccessToken"))
-    .setOAuthAccessTokenSecret(sys.env("twitterAccessTokenSecret"))
+    .setOAuthAccessTokenSecret(sys.env("twitterAccessTokenSecret")).build()
 
-  override lazy val ingestionController = new IngestionController(new AlertPipeline(new TwitterStreamFactory(twitterConfiguration), producer, ActorSystem.create()))
+  private val twitterStreamFactory: TwitterStreamFactory = new TwitterStreamFactory(twitterConfiguration)
+  private val alertPipeline: AlertPipeline = new AlertPipeline(twitterStreamFactory, producer, ActorSystem.create())
+  override lazy val ingestionController = new IngestionController(alertPipeline)
 }
 
 class FakeAppLoader(producer: KafkaProducer[Long, String]) extends ApplicationLoader {
