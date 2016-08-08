@@ -6,7 +6,7 @@ import play.api.libs.json._
 import play.api.mvc._
 import stream.AlertPipeline
 
-case class Alert(id: Int, name: String, requiredCriteria: String)
+case class Alert(name: String, requiredCriteria: String)
 
 @Singleton
 class IngestionController (alertPipeline: AlertPipeline) extends Controller {
@@ -17,7 +17,7 @@ class IngestionController (alertPipeline: AlertPipeline) extends Controller {
     val alertResult = request.body.validate[Alert]
     alertResult.fold(
       errors => {
-        BadRequest(Json.obj("status" -> "KO", "message" -> JsError.toJson(errors)))
+        BadRequest(Json.obj("message" -> JsError.toJson(errors)))
       },
       alert => {
         alertPipeline.push(alert)

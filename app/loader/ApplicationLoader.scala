@@ -45,7 +45,7 @@ class Components(context: ApplicationLoader.Context)
   private def buildAlertPipeline(): AlertPipeline = {
 
     val twitterConfigurationBuilder = new ConfigurationBuilder()
-    twitterConfigurationBuilder.setDebugEnabled(true)
+    twitterConfigurationBuilder.setDebugEnabled(false)
       .setOAuthConsumerKey(sys.env("twitterConsumerKey"))
       .setOAuthConsumerSecret(sys.env("twitterConsumerSecret"))
       .setOAuthAccessToken(sys.env("twitterAccessToken"))
