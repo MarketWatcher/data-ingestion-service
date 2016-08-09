@@ -1,4 +1,6 @@
-R=`dirname $(readlink -f $0)`
+#!/usr/bin/env bash
+DIR=`dirname $(readlink -f $0)`
+
 OLDPWD=`pwd`
 
 cd $DIR/../
