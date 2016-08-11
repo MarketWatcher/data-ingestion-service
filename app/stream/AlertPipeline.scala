@@ -6,18 +6,19 @@ import org.apache.kafka.clients.producer.KafkaProducer
 import twitter4j._
 import twitter4j.conf.Configuration
 
-class AlertPipeline(twitterStreamFactory: TwitterStreamFactory, producer: KafkaProducer[Long, String], actorSystem: ActorSystem) {
+class AlertPipeline(twitterConfiguration: Configuration, producer: KafkaProducer[String, String], actorSystem: ActorSystem) {
 
   def push(alert: Alert) = {
     val listener = createStatusListener(actorSystem, producer, alertName = alert.name)
 
+    val twitterStreamFactory: TwitterStreamFactory = new TwitterStreamFactory(twitterConfiguration)
     val twitterStream = twitterStreamFactory.getInstance
     twitterStream.addListener(listener)
 
     twitterStream.filter(new FilterQuery().track(Array(alert.requiredCriteria)))
   }
 
-  private def createStatusListener(actorSystem: ActorSystem, producer: KafkaProducer[Long, String], alertName: String): StatusListener = {
+  private def createStatusListener(actorSystem: ActorSystem, producer: KafkaProducer[String, String], alertName: String): StatusListener = {
     new StatusListener() {
       def onStatus(status: twitter4j.Status) {
         val twitActor: ActorRef = actorSystem.actorOf(Props(new TwitterActor(producer, alertName)), "twitActor" + status.getId)

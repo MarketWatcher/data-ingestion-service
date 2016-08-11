@@ -21,7 +21,6 @@ class IngestionController (alertPipeline: AlertPipeline) extends Controller {
       },
       alert => {
         alertPipeline.push(alert)
-
         Ok("SUCCESS")
       }
     )
