@@ -3,7 +3,7 @@ package controllers
 
 import java.io.File
 import java.util
-import java.util.Properties
+import java.util.{Properties, UUID}
 
 import akka.actor.ActorSystem
 import com.sksamuel.kafka.embedded.{EmbeddedKafka, EmbeddedKafkaConfig}
@@ -21,7 +21,7 @@ import stream.AlertPipeline
 import twitter4j.conf.ConfigurationBuilder
 
 class FakeApplicationComponents(context: Context, producer: KafkaProducer[String, String]) extends Components(context) {
-  val twitterConfiguration = new ConfigurationBuilder().setDebugEnabled(true)
+  val twitterConfiguration = new ConfigurationBuilder().setDebugEnabled(false)
     .setOAuthConsumerKey(sys.env("twitterConsumerKey"))
     .setOAuthConsumerSecret(sys.env("twitterConsumerSecret"))
     .setOAuthAccessToken(sys.env("twitterAccessToken"))
@@ -39,13 +39,19 @@ class FakeAppLoader(producer: KafkaProducer[String, String]) extends Application
 
 class IngestionControllerSpec extends FlatSpec with MockFactory with BeforeAndAfter with OneAppPerSuite {
 
-  var kafka: EmbeddedKafka = null
-  var kafkaConfig: EmbeddedKafkaConfig = null
-  var producer: KafkaProducer[String, String] = null
+  val requestPayload: String = """ {"id": "d19d5122-645d-11e6-8b77-86f30ca893d3", "name": "Alert1", "requiredCriteria": "iyi"} """
+  var kafka: EmbeddedKafka = _
+  var kafkaConfig: EmbeddedKafkaConfig = _
+  var producer: KafkaProducer[String, String] = _
+  var consumer: KafkaConsumer[String, String] = _
+
+  before {
+    consumer = createEmbeddedKafkaConsumer(kafkaConfig, "tweets")
+  }
 
   after {
-    producer.close()
-    kafka.stop()
+    //producer.close()
+  //  kafka.stop()
   }
 
   override implicit lazy val app: Application = {
@@ -57,28 +63,32 @@ class IngestionControllerSpec extends FlatSpec with MockFactory with BeforeAndAf
     val context = ApplicationLoader.createContext(
       new Environment(new File("."), ApplicationLoader.getClass.getClassLoader, Mode.Test)
     )
+    kafka.start()
     appLoader.load(context)
   }
 
-  "Data Ingestion" should "be triggered after alert creation" in {
-
-    val alertName: String = "Alert1"
-    kafka.start()
-    val consumer = createEmbeddedKafkaConsumer(kafkaConfig, alertName)
-
-    val json: String = """ {"id": 1, "name": "Alert1", "requiredCriteria": "iyi"} """
+ "Data Ingestion" should "be triggered after alert creation" in {
     val fakeRequest = FakeRequest(POST, "/init").withHeaders("Content-Type" -> "application/json")
-      .withBody(json)
+      .withBody(requestPayload)
     val result = route(fakeRequest).get
-    val records = consumer.poll(30000)
+    val records = consumer.poll(15000)
 
-    consumer.close()
-
-    val iterator: util.Iterator[ConsumerRecord[String, String]] = records.iterator
-    assert(iterator.hasNext)
+    assert(!records.isEmpty)
   }
 
-  def createEmbeddedKafkaProducer(config : EmbeddedKafkaConfig) : KafkaProducer[String, String] = {
+  "Kafka messages" should " contain alert id and tweet text" in {
+    val fakeRequest = FakeRequest(POST, "/init").withHeaders("Content-Type" -> "application/json")
+      .withBody(requestPayload)
+    val result = route(fakeRequest).get
+    val records = consumer.poll(15000)
+    val iterator: util.Iterator[ConsumerRecord[String, String]] = records.iterator
+    val record: ConsumerRecord[String, String] = iterator.next()
+    val alertId: UUID = UUID.fromString(record.key())
+
+    assert(alertId != null)
+  }
+
+  def createEmbeddedKafkaProducer(config: EmbeddedKafkaConfig): KafkaProducer[String, String] = {
     val producerProps = new Properties
     producerProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "***:" + config.kafkaPort)
     producerProps.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer")
@@ -93,6 +103,7 @@ class IngestionControllerSpec extends FlatSpec with MockFactory with BeforeAndAf
     consumerProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest")
     consumerProps.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer")
     consumerProps.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer")
+    consumerProps.put("logger.isDebugEnabled", "false")
     val consumer = new KafkaConsumer[String, String](consumerProps)
     consumer.subscribe(util.Arrays.asList(topicName))
     consumer
