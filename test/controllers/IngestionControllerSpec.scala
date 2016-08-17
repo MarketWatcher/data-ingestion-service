@@ -46,12 +46,14 @@ class IngestionControllerSpec extends FlatSpec with MockFactory with BeforeAndAf
   var consumer: KafkaConsumer[String, String] = _
 
   before {
+    Thread.sleep(10000)//one sad line. reason is; test still connects to twitter unfortunately, regarding async nature of tw api there has to be buffer between each test cases
+    producer = createEmbeddedKafkaProducer(kafkaConfig)
     consumer = createEmbeddedKafkaConsumer(kafkaConfig, "tweets")
   }
 
   after {
-    //producer.close()
-  //  kafka.stop()
+    producer.close()
+    consumer.close()
   }
 
   override implicit lazy val app: Application = {

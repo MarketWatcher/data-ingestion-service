@@ -27,7 +27,7 @@ class AlertPipeline(twitterConfiguration: Configuration, producer: KafkaProducer
       def onStatus(status: twitter4j.Status) {
         var twitActor: ActorRef = null
            twitActor = actorSystem.actorOf(Props(new TwitterActor(producer)), "twitActor" + Random.nextInt())
-        twitActor ! TwitterDataPullRequest(status)
+        twitActor ! TwitterDataPullRequest(status, alertId)
       }
 
       def onDeletionNotice(statusDeletionNotice: StatusDeletionNotice) {}
