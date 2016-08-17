@@ -1,12 +1,13 @@
 package controllers
 
+import java.util.UUID
 import javax.inject._
 
 import play.api.libs.json._
 import play.api.mvc._
 import stream.AlertPipeline
 
-case class Alert(name: String, requiredCriteria: String)
+case class Alert(id: UUID, name: String, requiredCriteria: String)
 
 @Singleton
 class IngestionController (alertPipeline: AlertPipeline) extends Controller {
