@@ -27,7 +27,7 @@ class FakeApplicationComponents(context: Context, producer: KafkaProducer[String
     .setOAuthAccessToken(sys.env("twitterAccessToken"))
     .setOAuthAccessTokenSecret(sys.env("twitterAccessTokenSecret")).build()
 
-  private val alertPipeline: AlertPipeline = new AlertPipeline(twitterConfiguration, producer, ActorSystem.create())
+  val alertPipeline: AlertPipeline = new AlertPipeline(twitterConfiguration, producer, ActorSystem.create())
   override lazy val ingestionController = new IngestionController(alertPipeline)
 }
 
@@ -46,13 +46,11 @@ class IngestionControllerSpec extends FlatSpec with MockFactory with BeforeAndAf
   var consumer: KafkaConsumer[String, String] = _
 
   before {
-    Thread.sleep(10000)//one sad line. reason is; test still connects to twitter unfortunately, regarding async nature of tw api there has to be buffer between each test cases
-    producer = createEmbeddedKafkaProducer(kafkaConfig)
+    Thread.sleep(10000)//one sad line. reason is; test still connects to twitter unfortunately, regarding async nature of tw api there has to be a buffer between each test cases
     consumer = createEmbeddedKafkaConsumer(kafkaConfig, "tweets")
   }
 
   after {
-    producer.close()
     consumer.close()
   }
 
