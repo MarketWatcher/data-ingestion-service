@@ -58,6 +58,7 @@ class IngestionControllerSpec extends FlatSpec with MockFactory with BeforeAndAf
     kafkaConfig = EmbeddedKafkaConfig()
     kafka = new EmbeddedKafka(kafkaConfig)
     producer = createEmbeddedKafkaProducer(kafkaConfig)
+    kafka.start()
 
     val appLoader = new FakeAppLoader(producer)
     val context = ApplicationLoader.createContext(
@@ -81,14 +82,26 @@ class IngestionControllerSpec extends FlatSpec with MockFactory with BeforeAndAf
       .withBody(requestPayload)
     val result = route(fakeRequest).get
     val records = consumer.poll(15000)
-    val iterator: util.Iterator[ConsumerRecord[String, String]] = records.iterator
-    val record: ConsumerRecord[String, String] = iterator.next()
-    val alertId: UUID = UUID.fromString(record.key())
 
-    assert(alertId != null)
   }
 
-  def createEmbeddedKafkaProducer(config: EmbeddedKafkaConfig): KafkaProducer[String, String] = {
+  "Data Ingestion" should "return error when alert id is not provided" in {
+    val json: String = """ {"requiredCriteria": "iyi"} """
+    val fakeRequest = FakeRequest(POST, "/init").withHeaders("Content-Type" -> "application/json")
+      .withBody(json)
+    val result = route(fakeRequest).get
+    assert(BAD_REQUEST == status(result))
+  }
+
+  "Data Ingestion" should "return error when required criteria is not provided" in {
+    val json: String = """ {"id": "d19d5122-645d-11e6-8b77-86f30ca893d3"} """
+    val fakeRequest = FakeRequest(POST, "/init").withHeaders("Content-Type" -> "application/json")
+      .withBody(json)
+    val result = route(fakeRequest).get
+    assert(BAD_REQUEST == status(result))
+  }
+
+  def createEmbeddedKafkaProducer(config : EmbeddedKafkaConfig) : KafkaProducer[String, String] = {
     val producerProps = new Properties
     producerProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "***:" + config.kafkaPort)
     producerProps.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer")
